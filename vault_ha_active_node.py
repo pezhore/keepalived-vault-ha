@@ -25,7 +25,7 @@ import os
 import requests
 import sys
 import logging
-from systemd import journal
+from cysystemd import journal
 
 log = logging.getLogger('keepalived-vault')
 
