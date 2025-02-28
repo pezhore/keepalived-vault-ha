@@ -24,9 +24,10 @@ import logging
 import os
 import requests
 import sys
-from systemd.journal import JournalHandler
+import logging
+from systemd import journal
 
-log = logging.getLogger('script')
+log = logging.getLogger('keepalived-vault')
 
 def parse_args():
     '''This function parses and return arguments passed in'''
@@ -57,6 +58,11 @@ def parse_args():
                   " ( https://github.com/madrisan/keepalived-vault-ha )"
                   .format(__version__))
     parser.add_argument(
+        "--skip-ssl-verify",
+        action = "store_true",
+        help = "Optional: Do not validate ssl certificates",
+        dest = "skipVerify")
+    parser.add_argument(
         "--cert",
         help = "Optional: path to client certificate for vault authentication.",
         dest = "cert",
@@ -74,7 +80,7 @@ def parse_args():
 
     return parser.parse_args()
 
-def check_vault(url, timeout, cacert, cert, certkey):
+def check_vault(url, timeout, cacert, cert, certkey, skipVerify ):
     '''This function returns True if the node pointed by url (if the --url
        command option has been set) or by the environment variable VAULT_ADDR
        is active, False otherwise.'''
@@ -107,6 +113,9 @@ def check_vault(url, timeout, cacert, cert, certkey):
     log.debug('Querying the URL: {}'.format(leader_url))
 
     try:
+        # If we are skipping verify, then don't check certs
+        if skipVerify:
+            vault_ca = False
         r = requests.get(leader_url,
                          timeout=timeout,
                          cert=ssl_pair,
@@ -135,7 +144,7 @@ def check_vault(url, timeout, cacert, cert, certkey):
 if __name__ == '__main__':
     args = parse_args()
 
-    log.addHandler(JournalHandler())
+    log.addHandler(journal.JournaldLogHandler())
     if args.debug:
         log.setLevel(logging.DEBUG)
 
@@ -143,7 +152,8 @@ if __name__ == '__main__':
                             args.timeout,
                             args.cacert,
                             args.cert,
-                            args.certkey)
+                            args.certkey,
+                            args.skipVerify)
     log.debug('Vault HA active node: {}'.format(is_active))
 
     sys.exit(0 if is_active else 1)
